@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Offline LMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d1117;
+  --bg2:       #161b22;
+  --bg3:       #1c2330;
+  --border:    #30363d;
+  --accent:    #38bdf8;
+  --accent2:   #0ea5e9;
+  --text:      #e6edf3;
+  --muted:     #7d8590;
+  --success:   #3fb950;
+  --topbar-h:  52px;
+  --sidebar-w: 300px;
+  --controls-h: 56px;
+  --radius:    8px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ═══════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════ */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px 0 20px;
+  gap: 12px;
+  position: relative;
+  z-index: 50;
+  flex-shrink: 0;
+}
+.topbar-logo {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+}
+.topbar-logo span { color: var(--text); }
+.topbar-divider { width: 1px; height: 18px; background: var(--border); }
+
+/* breadcrumb in topbar */
+.topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+}
+.topbar-breadcrumb span {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+/* progress compact in topbar */
+.topbar-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.topbar-progress-label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.topbar-progress-track {
+  width: 100px;
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.topbar-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: 99px;
+  transition: width .4s ease;
+}
+.topbar-pct {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 28px;
+}
+
+.folder-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  background: var(--accent);
+  color: #0a0f14;
+  border: none;
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s;
+  letter-spacing: .2px;
+}
+.folder-btn:hover { background: var(--accent2); }
+
+/* ═══════════════════════════════════════════
+   SHELL — fills remaining height
+═══════════════════════════════════════════ */
+.shell {
+  display: flex;
+  height: calc(100vh - var(--topbar-h));
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   MAIN — left column
+═══════════════════════════════════════════ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── VIDEO grows to fill all available height ── */
+.video-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 12px 0;
+  display: flex;
+  flex-direction: column;
+}
+.video-container {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #000;
+}
+
+/* empty state */
+.no-video {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+}
+.no-video svg { opacity: .25; }
+.no-video p { font-size: 13px; max-width: 220px; text-align: center; line-height: 1.6; }
+.no-video .open-hint {
+  margin-top: 4px;
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #0a0f14;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── CONTROLS BAR — always visible below video ── */
+.controls-bar {
+  flex-shrink: 0;
+  height: var(--controls-h);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  margin: 0 0;
+}
+
+.video-title-small {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.ctrl-sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 13px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.ctrl-btn:hover:not(:disabled) { border-color: var(--accent); background: #38bdf810; color: var(--accent); }
+.ctrl-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+.ctrl-btn.next-btn {
+  background: var(--accent);
+  color: #0a0f14;
+  border-color: transparent;
+}
+.ctrl-btn.next-btn:hover:not(:disabled) { background: var(--accent2); }
+
+.ctrl-btn.mark-btn {
+  border-color: var(--success);
+  color: var(--success);
+  background: transparent;
+}
+.ctrl-btn.mark-btn:hover { background: #3fb95015; }
+.ctrl-btn.mark-btn.done {
+  background: var(--success);
+  color: #0a0f14;
+}
+.ctrl-btn.mark-btn.done:hover { background: #2ea043; border-color: #2ea043; }
+
+/* ── NOTES TAB below controls ── */
+.notes-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.notes-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.notes-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .3px;
+}
+.notes-toggle-actions { display: flex; align-items: center; gap: 8px; }
+.notes-chevron {
+  transition: transform .2s;
+  color: var(--muted);
+}
+.notes-chevron.open { transform: rotate(180deg); }
+
+.notes-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .25s ease;
+}
+.notes-body.open { max-height: 160px; }
+
+.notes-body textarea {
+  width: 100%;
+  height: 120px;
+  background: var(--bg2);
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  resize: none;
+  outline: none;
+  display: block;
+}
+.notes-body textarea::placeholder { color: var(--muted); }
+
+.save-notes-btn {
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: border-color .15s, color .15s;
+}
+.save-notes-btn:hover { border-color: var(--accent); color: var(--accent); }
+.save-notes-btn.saved { border-color: var(--success); color: var(--success); }
+
+/* ═══════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════ */
+.sidebar {
+  width: var(--sidebar-w);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg2);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sidebar-header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.sidebar-count {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: #38bdf812;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.sidebar-list::-webkit-scrollbar { width: 4px; }
+.sidebar-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* playlist items */
+.playlist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background .1s;
+}
+.playlist-item:hover { background: var(--bg3); }
+.playlist-item.active { background: #38bdf80c; border-left-color: var(--accent); }
+.playlist-item.completed { opacity: .6; }
+
+.item-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  width: 16px;
+  text-align: right;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+.item-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  transition: background .15s, border-color .15s;
+}
+.playlist-item.completed .item-check {
+  background: var(--success);
+  border-color: var(--success);
+}
+.item-info { flex: 1; min-width: 0; }
+.item-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.playlist-item.active .item-name { color: var(--accent); }
+.item-ext { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* empty sidebar */
+.sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.sidebar-empty p { font-size: 12px; line-height: 1.6; }
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(60px);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: transform .25s ease;
+  z-index: 999;
+  box-shadow: 0 4px 20px #00000070;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-logo">Offline<span>LMS</span></div>
+  <div class="topbar-divider"></div>
+
+  <div class="topbar-breadcrumb">
+    Course Platform &rsaquo; Courses &rsaquo; <span id="courseTitle">No Course Loaded</span>
+  </div>
+
+  <div class="topbar-progress">
+    <div class="topbar-progress-label" id="progressLabel">0 of 0</div>
+    <div class="topbar-progress-track">
+      <div class="topbar-progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <div class="topbar-pct" id="progressPct">0%</div>
+  </div>
+
+  <div class="topbar-divider"></div>
+
+  <button class="folder-btn" onclick="openFolder()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+    Open Folder
+  </button>
+</header>
+
+<!-- SHELL -->
+<div class="shell">
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- VIDEO (fills remaining space) -->
+    <div class="video-wrap">
+      <div class="video-container" id="videoContainer">
+        <div class="no-video" id="noVideo">
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+          <p>Open a folder with your downloaded videos to get started.</p>
+          <button class="open-hint" onclick="openFolder()">Open Folder</button>
+        </div>
+        <video id="videoPlayer" style="display:none" controls preload="metadata"></video>
+      </div>
+    </div>
+
+    <!-- CONTROLS BAR — always visible, never needs scroll -->
+    <div class="controls-bar">
+      <div class="video-title-small" id="videoTitle">Select a video</div>
+
+      <div class="ctrl-sep"></div>
+
+      <button class="ctrl-btn" id="prevBtn" onclick="prevVideo()" disabled>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Prev
+      </button>
+
+      <button class="ctrl-btn next-btn" id="nextBtn" onclick="nextVideo()" disabled>
+        Next
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
+      <div class="ctrl-sep"></div>
+
+      <button class="ctrl-btn mark-btn" id="markBtn" onclick="toggleComplete()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Mark Complete
+      </button>
+    </div>
+
+    <!-- NOTES — collapsible panel at bottom -->
+    <div class="notes-panel">
+      <div class="notes-toggle" onclick="toggleNotes()">
+        <div class="notes-toggle-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          My Notes
+        </div>
+        <div class="notes-toggle-actions">
+          <button class="save-notes-btn" id="saveNotesBtn" onclick="event.stopPropagation(); saveNotes()">Save</button>
+          <svg class="notes-chevron" id="notesChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+      <div class="notes-body" id="notesBody">
+        <textarea id="notesArea" placeholder="Write your notes for this video…"></textarea>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Course Content</div>
+      <div class="sidebar-count" id="sidebarCount">0/0</div>
+    </div>
+    <div class="sidebar-list" id="playlistEl">
+      <div class="sidebar-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".3">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M9 3v18M3 9h18"/>
+        </svg>
+        <p>Your playlist will appear here after you open a folder.</p>
+      </div>
+    </div>
+  </aside>
+
+</div><!-- /shell -->
+
+<div id="toast"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────
+let playlist   = [];
+let currentIdx = -1;
+let completed  = new Set();
+let notes      = {};
+let notesOpen  = false;
+
+const STORAGE_KEY = 'offlineLMS_v2';
+
+// ─── STORAGE ──────────────────────────────────────
+function loadStorage() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    completed = new Set(d.completed || []);
+    notes     = d.notes || {};
+    notesOpen = d.notesOpen || false;
+    if (notesOpen) openNotesPanel();
+  } catch {}
+}
+function saveStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      completed: [...completed], notes, notesOpen
+    }));
+  } catch {}
+}
+
+// ─── NOTES TOGGLE ─────────────────────────────────
+function toggleNotes() {
+  notesOpen = !notesOpen;
+  notesOpen ? openNotesPanel() : closeNotesPanel();
+  saveStorage();
+}
+function openNotesPanel() {
+  notesOpen = true;
+  document.getElementById('notesBody').classList.add('open');
+  document.getElementById('notesChevron').classList.add('open');
+}
+function closeNotesPanel() {
+  notesOpen = false;
+  document.getElementById('notesBody').classList.remove('open');
+  document.getElementById('notesChevron').classList.remove('open');
+}
+
+// ─── OPEN FOLDER ──────────────────────────────────
+async function openFolder() {
+  try {
+    const dir = await window.showDirectoryPicker({ mode: 'read' });
+    await loadDir(dir);
+  } catch (e) {
+    if (e.name !== 'AbortError') showToast('Could not open: ' + e.message);
+  }
+}
+
+const VIDEO_EXTS = new Set(['mp4','mkv','webm','avi','mov','m4v','ogv','flv','ts']);
+const ext = n => n.split('.').pop().toLowerCase();
+
+async function loadDir(dir) {
+  const files = [];
+  for await (const e of dir.values())
+    if (e.kind === 'file' && VIDEO_EXTS.has(ext(e.name))) files.push(e);
+
+  files.sort((a, b) => naturalCompare(a.name, b.name));
+  if (!files.length) { showToast('No video files found.'); return; }
+
+  playlist.forEach(v => v.url && URL.revokeObjectURL(v.url));
+  playlist    = files.map(fh => ({ name: fh.name, url: null, handle: fh }));
+  currentIdx  = -1;
+
+  document.getElementById('courseTitle').textContent = dir.name || 'Local Playlist';
+  renderPlaylist();
+  updateProgress();
+  playVideo(0);
+  showToast(`Loaded ${playlist.length} videos ✓`);
+}
+
+// ─── RENDER PLAYLIST ──────────────────────────────
+function renderPlaylist() {
+  const el = document.getElementById('playlistEl');
+  el.innerHTML = '';
+  playlist.forEach((v, i) => {
+    const div = document.createElement('div');
+    div.className = 'playlist-item'
+      + (i === currentIdx ? ' active' : '')
+      + (completed.has(v.name) ? ' completed' : '');
+    div.onclick = () => playVideo(i);
+
+    const tick = completed.has(v.name)
+      ? `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#0a0f14" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : '';
+
+    div.innerHTML = `
+      <div class="item-num">${i + 1}</div>
+      <div class="item-check">${tick}</div>
+      <div class="item-info">
+        <div class="item-name">${cleanName(v.name)}</div>
+        <div class="item-ext">${ext(v.name).toUpperCase()}</div>
+      </div>`;
+    el.appendChild(div);
+  });
+  document.getElementById('sidebarCount').textContent = `${completed.size}/${playlist.length}`;
+}
+
+// ─── PLAY VIDEO ───────────────────────────────────
+async function playVideo(idx) {
+  if (idx < 0 || idx >= playlist.length) return;
+  if (currentIdx >= 0) saveNotesSilent();
+
+  currentIdx = idx;
+  const v = playlist[idx];
+
+  if (!v.url) {
+    const file = await v.handle.getFile();
+    v.url = URL.createObjectURL(file);
+  }
+
+  const player = document.getElementById('videoPlayer');
+  player.src = v.url;
+  player.style.display = 'block';
+  document.getElementById('noVideo').style.display = 'none';
+  player.play().catch(() => {});
+
+  document.getElementById('videoTitle').textContent = cleanName(v.name);
+  document.getElementById('notesArea').value = notes[v.name] || '';
+
+  const snb = document.getElementById('saveNotesBtn');
+  snb.textContent = 'Save'; snb.classList.remove('saved');
+
+  const mb = document.getElementById('markBtn');
+  if (completed.has(v.name)) { mb.innerHTML = tickIcon() + ' Completed'; mb.classList.add('done'); }
+  else { mb.innerHTML = tickIcon() + ' Mark Complete'; mb.classList.remove('done'); }
+
+  document.getElementById('prevBtn').disabled = idx === 0;
+  document.getElementById('nextBtn').disabled = idx === playlist.length - 1;
+
+  renderPlaylist();
+  updateProgress();
+
+  const activeEl = document.getElementById('playlistEl').querySelector('.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  saveStorage();
+}
+
+function tickIcon() {
+  return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+}
+
+// ─── NAV ──────────────────────────────────────────
+function prevVideo() { if (currentIdx > 0) playVideo(currentIdx - 1); }
+function nextVideo() { if (currentIdx < playlist.length - 1) playVideo(currentIdx + 1); }
+
+document.getElementById('videoPlayer').addEventListener('ended', () => {
+  if (currentIdx >= 0 && !completed.has(playlist[currentIdx].name)) markComplete(currentIdx);
+  if (currentIdx < playlist.length - 1) nextVideo();
+});
+
+// ─── COMPLETE ─────────────────────────────────────
+function toggleComplete() {
+  if (currentIdx < 0) return;
+  const name = playlist[currentIdx].name;
+  const mb = document.getElementById('markBtn');
+  if (completed.has(name)) {
+    completed.delete(name);
+    mb.innerHTML = tickIcon() + ' Mark Complete';
+    mb.classList.remove('done');
+  } else {
+    markComplete(currentIdx);
+  }
+  renderPlaylist(); updateProgress(); saveStorage();
+}
+function markComplete(idx) {
+  completed.add(playlist[idx].name);
+  if (idx === currentIdx) {
+    const mb = document.getElementById('markBtn');
+    mb.innerHTML = tickIcon() + ' Completed';
+    mb.classList.add('done');
+  }
+}
+
+// ─── PROGRESS ─────────────────────────────────────
+function updateProgress() {
+  const total = playlist.length, done = completed.size;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressLabel').textContent = `${done} of ${total}`;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('sidebarCount').textContent = `${done}/${total}`;
+}
+
+// ─── NOTES ────────────────────────────────────────
+function saveNotesSilent() {
+  if (currentIdx < 0) return;
+  notes[playlist[currentIdx].name] = document.getElementById('notesArea').value;
+  saveStorage();
+}
+function saveNotes() {
+  if (currentIdx < 0) return;
+  saveNotesSilent();
+  const btn = document.getElementById('saveNotesBtn');
+  btn.textContent = '✓ Saved'; btn.classList.add('saved');
+  setTimeout(() => { btn.textContent = 'Save'; btn.classList.remove('saved'); }, 1800);
+}
+
+// ─── HELPERS ──────────────────────────────────────
+function cleanName(n) {
+  return n.replace(/\.[^.]+$/, '').replace(/^[\d\s._\-–]+/, '').trim() || n;
+}
+function naturalCompare(a, b) {
+  const re = /(\d+)|(\D+)/g;
+  const ax = a.match(re)||[], bx = b.match(re)||[];
+  while (ax.length && bx.length) {
+    const av = ax.shift(), bv = bx.shift();
+    const an = parseInt(av), bn = parseInt(bv);
+    if (!isNaN(an)&&!isNaN(bn)) { if (an!==bn) return an-bn; }
+    else if (av!==bv) return av<bv?-1:1;
+  }
+  return ax.length - bx.length;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ─── KEYBOARD ─────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (['TEXTAREA','INPUT'].includes(e.target.tagName)) return;
+  if (e.key === 'ArrowRight' || e.key === 'n') nextVideo();
+  if (e.key === 'ArrowLeft'  || e.key === 'p') prevVideo();
+  if (e.key === 'c') toggleComplete();
+  if (e.key === 'Escape') closeNotesPanel();
+});
+
+// ─── INIT ─────────────────────────────────────────
+loadStorage();
+</script>
+</body>
+</html>
